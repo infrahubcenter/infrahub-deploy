@@ -1,12 +1,23 @@
-# Infra Hub Center on Kubernetes -- the full platform from the published
-# images on docker.io/infrahubcenter.
+# Infra Hub Center on Kubernetes -- API, console and gateway from the
+# published images on docker.io/infrahubcenter:
+#   infrahub-api      docker.io/infrahubcenter/infrahub-api:1.0.0
+#   infrahub-ui       docker.io/infrahubcenter/infrahub-ui:1.0.0
+#   infrahub-gateway  docker.io/infrahubcenter/infrahub-gateway:1.0.0
+#
+# Database -- choose one:
+#   * Managed PostgreSQL 14+ (RDS, Cloud SQL, Azure, ...): put its URL in
+#     the Secret's database-url (sslmode=require for cloud databases).
+#   * Built-in: also apply postgres.yaml (StatefulSet + 10 Gi volume) and
+#     use postgres://infrahub:<postgres-password>@infrahub-postgres:5432/infrahub?sslmode=disable
 #
 #   kubectl create namespace infrahub
 #   kubectl -n infrahub create secret generic infrahub-secrets \
-#     --from-literal=postgres-password="$(openssl rand -hex 24)" \
-#     --from-literal=jwt-secret="$(openssl rand -base64 48)" \
+#     --from-literal=database-url='postgres://USER:PASSWORD@HOST:5432/infrahub?sslmode=require' \
+#     --from-literal=jwt-secret="$(openssl rand -hex 48)" \
 #     --from-literal=ssh-credential-encryption-key="$(openssl rand -base64 32)" \
 #     --from-literal=bootstrap-admin-password='<first-admin-password>'
+#   # (built-in database: add --from-literal=postgres-password=<pw> and
+#   #  kubectl apply -f postgres.yaml)
 #   # edit PUBLIC_URL / BOOTSTRAP_ADMIN_EMAIL in the ConfigMap below, then:
 #   kubectl apply -f infrahub.yaml
 #   kubectl -n infrahub get pods,svc
@@ -17,7 +28,10 @@
 #
 # The gateway Service is type LoadBalancer (cloud load balancer, or
 # localhost on Docker Desktop). For an Ingress controller instead, see
-# ingress.yaml next to this file.
+# ingress.yaml next to this file. No load balancer on the cluster (kind,
+# bare metal) and EXTERNAL-IP stays <pending>? Change the Service to
+# type: NodePort, or test with:
+#   kubectl -n infrahub port-forward svc/infrahub-gateway 8080:80
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,72 +47,6 @@ data:
   # community | team | business | enterprise
   INFRAHUB_PLAN: "community"
   INFRAHUB_MARKETING_URL: ""
----
-# ---------------- PostgreSQL ----------------
-apiVersion: v1
-kind: Service
-metadata:
-  name: infrahub-postgres
-  namespace: infrahub
-spec:
-  selector:
-    app: infrahub-postgres
-  ports:
-    - port: 5432
-      targetPort: 5432
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: infrahub-postgres
-  namespace: infrahub
-spec:
-  serviceName: infrahub-postgres
-  replicas: 1
-  selector:
-    matchLabels:
-      app: infrahub-postgres
-  template:
-    metadata:
-      labels:
-        app: infrahub-postgres
-    spec:
-      containers:
-        - name: postgres
-          image: postgres:16-alpine
-          env:
-            - name: POSTGRES_DB
-              value: infrahub
-            - name: POSTGRES_USER
-              value: infrahub
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: infrahub-secrets
-                  key: postgres-password
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-          ports:
-            - containerPort: 5432
-          readinessProbe:
-            exec:
-              command: ["pg_isready", "-U", "infrahub", "-d", "infrahub"]
-            periodSeconds: 5
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
 ---
 # ---------------- API ----------------
 apiVersion: v1
@@ -142,13 +90,13 @@ spec:
               value: production
             - name: INFRAHUB_CONFIG_DIR
               value: /etc/infrahub
-            - name: POSTGRES_PASSWORD
+            # Built-in (postgres.yaml) or managed PostgreSQL -- whichever
+            # connection string the infrahub-secrets Secret holds.
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: infrahub-secrets
-                  key: postgres-password
-            - name: DATABASE_URL
-              value: postgres://infrahub:$(POSTGRES_PASSWORD)@infrahub-postgres:5432/infrahub?sslmode=disable
+                  key: database-url
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

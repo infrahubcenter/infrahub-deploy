@@ -1,0 +1,72 @@
+# Optional built-in PostgreSQL 16 for Infra Hub Center (StatefulSet with a
+# 10 Gi persistent volume). Skip this file when using a managed database.
+#
+# Needs postgres-password in the infrahub-secrets Secret, and the Secret's
+# database-url set to:
+#   postgres://infrahub:<postgres-password>@infrahub-postgres:5432/infrahub?sslmode=disable
+#
+#   kubectl apply -f postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: infrahub-postgres
+  namespace: infrahub
+spec:
+  selector:
+    app: infrahub-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: infrahub-postgres
+  namespace: infrahub
+spec:
+  serviceName: infrahub-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infrahub-postgres
+  template:
+    metadata:
+      labels:
+        app: infrahub-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: infrahub
+            - name: POSTGRES_USER
+              value: infrahub
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infrahub-secrets
+                  key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "infrahub", "-d", "infrahub"]
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

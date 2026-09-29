@@ -12,9 +12,10 @@ plus `latest`.
 | `infrahubcenter/infrahub-ui` | Web console |
 | `infrahubcenter/infrahub-gateway` | nginx entry point: `/api/*` (incl. WebSockets) to the API, everything else to the console |
 | `infrahubcenter/infrahub-docker-agent` | Agent for Docker hosts |
-| `infrahubcenter/infrahub-vm-agent` | Agent for Linux VMs (also tagged `infrahub-{linux,windows,mac}-os-agent`) |
+| `infrahubcenter/infrahub-vm-agent` | Agent for Linux VMs (metrics + journal logs) |
 | `infrahubcenter/infrahub-k8s-agent` | In-cluster Kubernetes agent |
 | `infrahubcenter/infrahub-site` | Public marketing site |
+| `postgres:16-alpine` (optional) | Built-in database -- or use a managed PostgreSQL via `DATABASE_URL` |
 
 ## Docker Compose
 
@@ -36,6 +37,18 @@ curl -s http://localhost/api/health
 server (its IP or domain -- not `localhost` when agents run elsewhere).
 Behind HTTPS, set `PUBLIC_URL=https://...` and `COOKIE_SECURE=true`.
 
+**Database -- built-in or managed.** `.env.example` enables the built-in
+PostgreSQL container (`COMPOSE_PROFILES=postgres`). For a managed database
+(AWS RDS/Aurora, Google Cloud SQL, Azure Database for PostgreSQL, or your
+own PostgreSQL 14+ server), delete that line and set:
+
+```bash
+DATABASE_URL=postgres://infrahub:<password>@<db-host>:5432/infrahub?sslmode=require
+```
+
+The postgres container is then not started at all; the API creates every
+table in the (empty) database on first start.
+
 Upgrade: change `INFRAHUB_VERSION` in `.env`, then
 `docker compose pull && docker compose up -d`.
 
@@ -43,17 +56,40 @@ Upgrade: change `INFRAHUB_VERSION` in `.env`, then
 
 ```bash
 kubectl create namespace infrahub
+
+# Managed database:
 kubectl -n infrahub create secret generic infrahub-secrets \
-  --from-literal=postgres-password="$(openssl rand -hex 24)" \
+  --from-literal=database-url='postgres://infrahub:<password>@<db-host>:5432/infrahub?sslmode=require' \
   --from-literal=jwt-secret="$(openssl rand -hex 48)" \
   --from-literal=ssh-credential-encryption-key="$(openssl rand -base64 32)" \
   --from-literal=bootstrap-admin-password='<first-admin-password>'
+
+# ...or built-in database: use these two keys instead of the database-url above
+#   PGPW=$(openssl rand -hex 24)
+#   --from-literal=postgres-password="$PGPW"
+#   --from-literal=database-url="postgres://infrahub:$PGPW@infrahub-postgres:5432/infrahub?sslmode=disable"
+# and: kubectl apply -f https://raw.githubusercontent.com/infrahubcenter/infrahub-deploy/main/deploy/kubernetes/postgres.yaml
 
 curl -fsSLO https://raw.githubusercontent.com/infrahubcenter/infrahub-deploy/main/deploy/kubernetes/infrahub.yaml
 nano infrahub.yaml   # PUBLIC_URL and BOOTSTRAP_ADMIN_EMAIL in the ConfigMap
 kubectl apply -f infrahub.yaml
 kubectl -n infrahub get pods,svc
 ```
+
+## Individual containers
+
+Each service is its own image, so it can run on any orchestrator (ECS,
+Nomad, Swarm, plain Docker):
+
+| Container | Image | Port | Required settings |
+|---|---|---|---|
+| infrahub-api | `docker.io/infrahubcenter/infrahub-api:1.0.0` | 8080 | `DATABASE_URL`, `JWT_SECRET`, `SSH_CREDENTIAL_ENCRYPTION_KEY`, `PUBLIC_URL`, `INFRAHUB_CONFIG_DIR=/etc/infrahub` (env-only config) |
+| infrahub-ui | `docker.io/infrahubcenter/infrahub-ui:1.0.0` | 3000 | optional `INFRAHUB_PLAN`, `INFRAHUB_MARKETING_URL` |
+| infrahub-gateway | `docker.io/infrahubcenter/infrahub-gateway:1.0.0` | 80 | optional `INFRAHUB_API_UPSTREAM` (default `infrahub-api:8080`), `INFRAHUB_UI_UPSTREAM` (default `infrahub-ui:3000`) |
+| postgres (optional) | `postgres:16-alpine` | 5432 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` |
+
+Only the gateway needs a published port. Full `docker run` examples are on
+the site's installation page (Method 3).
 
 The gateway Service is `type: LoadBalancer`. With an Ingress controller,
 switch it to `ClusterIP` and apply [kubernetes/ingress.yaml](kubernetes/ingress.yaml).

@@ -5,6 +5,13 @@
 #   2. docker compose up -d
 #   3. open PUBLIC_URL and sign in with BOOTSTRAP_ADMIN_EMAIL / _PASSWORD
 #
+# Database -- pick one in .env:
+#   * Built-in PostgreSQL: COMPOSE_PROFILES=postgres (default). Runs the
+#     "postgres" service below with a persistent volume.
+#   * Managed PostgreSQL (AWS RDS, Cloud SQL, Azure Database, your own
+#     server): remove COMPOSE_PROFILES and set DATABASE_URL. The postgres
+#     service is then not started at all.
+#
 # On first start the API migrates and seeds the database and creates the
 # first admin automatically (docker-entrypoint.sh in infrahub-api).
 name: infrahub
@@ -12,11 +19,12 @@ name: infrahub
 services:
   postgres:
     image: postgres:16-alpine
+    profiles: ["postgres"]
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-infrahub}
       POSTGRES_USER: ${POSTGRES_USER:-infrahub}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,11 +39,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        # Not required: with a managed database the postgres service is
+        # not part of the project and the API connects to DATABASE_URL.
+        required: false
     environment:
       APP_ENV: production
       # No config file: everything comes from the variables below.
       INFRAHUB_CONFIG_DIR: /etc/infrahub
-      DATABASE_URL: postgres://${POSTGRES_USER:-infrahub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-infrahub}?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-infrahub}:${POSTGRES_PASSWORD:-}@postgres:5432/${POSTGRES_DB:-infrahub}?sslmode=disable}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       SSH_CREDENTIAL_ENCRYPTION_KEY: ${SSH_CREDENTIAL_ENCRYPTION_KEY:?set SSH_CREDENTIAL_ENCRYPTION_KEY in .env}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
