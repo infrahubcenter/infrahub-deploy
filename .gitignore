@@ -1,0 +1,72 @@
+# This repository is infrahub-deploy: compose files, Kubernetes manifests,
+# the gateway image and docs. The application code lives in its own
+# repositories (cloned alongside for local development):
+/infrahub-api/
+/infrahub-ui/
+/infrahub-site/
+/infrahub-agents/
+
+# Local start/stop helper scripts are not part of the repository.
+/start-all.sh
+/start-local-all.sh
+/stop-local-all.sh
+/ngrok-local.sh
+/package-lock.json
+/.claude/
+deploy/docker/.env
+/CLAUDE.md
+/AGENTS.md
+
+# --- Environment files ---
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- Go ---
+infrahub-api/tmp/
+infrahub-api/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# --- Node / Next.js ---
+infrahub-ui/node_modules/
+infrahub-ui/.next/
+infrahub-ui/out/
+infrahub-ui/build/
+infrahub-ui/.turbo/
+infrahub-ui/next-env.d.ts
+infrahub-ui/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Local-only config/compose (per-developer secrets or machine-specific
+# overrides -- distinct from production.ini.enc and compose.yml, which
+# stay committed as safe, fillable templates; see each folder's own
+# compose.local.yml/development.ini.enc header comment) ---
+infrahub-api/development.ini.enc
+infrahub-api/compose.local.yml
+infrahub-ui/compose.local.yml
+
+# --- start-local-all.sh runtime artifacts ---
+.local-logs/
+.local-run.pids
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini

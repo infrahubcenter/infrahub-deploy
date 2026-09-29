@@ -1,0 +1,80 @@
+# Full-stack production-style deployment: PostgreSQL + the Go backend +
+# the Next.js frontend, all built from source. Deliberately a SEPARATE file
+# from docker-compose.yml, which only ever runs Postgres for local
+# development (`go run ./cmd/server` / `npm run dev` against it) -- running
+# `docker compose up` day-to-day is completely unaffected by this file's
+# existence, per Step 20's "keep local development simple."
+#
+# Usage (see docs/deployment.md for the full walkthrough):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml exec infrahub-api ./migrate up
+#
+# Required before the first run:
+#   - infrahub-api/production.ini.enc filled in with real production values
+#     (DATABASE_URL, JWT_SECRET, SSH_CREDENTIAL_ENCRYPTION_KEY,
+#     FRONTEND_ORIGIN, ...), every secret value ENC(...)-wrapped -- see
+#     infrahub-api/production.ini.enc's own header comment and
+#     `go run ./cmd/encrypt-config-value`. This file is safe to commit
+#     (ciphertext only) and gets baked straight into the backend image.
+#     DATABASE_URL's host must be "postgres" (this file's service name
+#     below), not "localhost".
+#   - INFRAHUB_MASTER_KEY (the one key that decrypts production.ini.enc's
+#     ENC(...) values), POSTGRES_PASSWORD, and NEXT_PUBLIC_API_BASE_URL
+#     set in the shell environment or a root .env file that
+#     `docker compose` reads for ${...} substitution in THIS file --
+#     distinct from infrahub-api/production.ini.enc, which the backend
+#     container decrypts for its own application config.
+#     INFRAHUB_MASTER_KEY specifically must be a real secret here (a
+#     deploy-time env var / CI secret), never a file baked into any image
+#     -- see internal/config/encrypted_env.go's own doc comment.
+#
+# This does not include a reverse proxy / TLS termination -- see
+# docs/deployment.md for how that fits in front of it.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vmcc}
+      POSTGRES_USER: ${POSTGRES_USER:-vmcc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, see docs/deployment.md}
+    volumes:
+      - vmcc_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vmcc} -d ${POSTGRES_DB:-vmcc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  infrahub-api:
+    build:
+      context: ./infrahub-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      INFRAHUB_MASTER_KEY: ${INFRAHUB_MASTER_KEY:?INFRAHUB_MASTER_KEY is required -- it decrypts infrahub-api/production.ini.enc, see docs/deployment.md}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  infrahub-ui:
+    build:
+      context: ./infrahub-ui
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required, see docs/deployment.md}
+    restart: unless-stopped
+    depends_on:
+      - infrahub-api
+    ports:
+      - "3000:3000"
+
+volumes:
+  vmcc_postgres_data:

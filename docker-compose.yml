@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vmcc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vmcc}
+      POSTGRES_USER: ${POSTGRES_USER:-vmcc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vmcc_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - vmcc_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vmcc} -d ${POSTGRES_DB:-vmcc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  vmcc_postgres_data:

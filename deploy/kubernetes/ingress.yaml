@@ -1,0 +1,36 @@
+# Optional: expose Infra Hub Center through an Ingress controller (e.g.
+# ingress-nginx) instead of the gateway's LoadBalancer Service.
+#
+#   1. In infrahub.yaml, change the infrahub-gateway Service to type: ClusterIP
+#   2. Set host below (and PUBLIC_URL in the ConfigMap) to your domain
+#   3. kubectl apply -f ingress.yaml
+#
+# The gateway keeps doing the /api vs console routing, so the Ingress only
+# needs one rule. WebSockets (VM console, live logs, agents) need the long
+# timeouts below.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrahub
+  namespace: infrahub
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # With cert-manager: cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: infrahub.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: infrahub-gateway
+                port:
+                  number: 80
+  # tls:
+  #   - hosts: [infrahub.example.com]
+  #     secretName: infrahub-tls
