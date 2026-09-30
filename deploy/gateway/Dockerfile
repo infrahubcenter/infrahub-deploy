@@ -2,7 +2,8 @@
 # API and the console -- /api/* (REST + WebSockets: VM console, live logs,
 # agent connections) to infrahub-api, everything else to infrahub-ui.
 # Published as docker.io/infrahubcenter/infrahub-gateway.
-FROM nginx:1.27-alpine
+# alpine-slim: same nginx + template support (envsubst), ~20 MB instead of ~74 MB.
+FROM nginx:1.27-alpine-slim
 
 # Upstreams, substituted into the config at container start by the nginx
 # image's own template step. Defaults match the service names used by
