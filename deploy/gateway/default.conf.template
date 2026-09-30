@@ -19,6 +19,9 @@ server {
 
     location /api/ {
         proxy_pass http://infrahub_api;
+        # Shared key the API requires when its INFRAHUB_PROXY_KEY is set
+        # (empty = not configured; see the API's middleware.RequireProxyKey).
+        proxy_set_header X-Infrahub-Proxy-Key "${INFRAHUB_PROXY_KEY}";
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;

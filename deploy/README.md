@@ -104,3 +104,20 @@ the gateway from [gateway/](gateway/):
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t docker.io/infrahubcenter/infrahub-gateway:1.0.0 --push deploy/gateway
 ```
+
+## Hosting the console separately (e.g. Vercel) with a private backend
+
+The console can run on its own host while the API stays on your server:
+
+- **Console** (`infrahub-ui`) settings: `INFRAHUB_BACKEND_URL` (the API's
+  address, server-side only), `INFRAHUB_PROXY_KEY` (shared secret),
+  `INFRAHUB_WS_BASE_URL` (the API's public `wss://` address). Browsers call
+  the console's own `/api/*`, which proxies to the API with the key, so the
+  login cookie stays on the console's domain and the key never reaches the
+  browser. WebSockets go straight to the API with a 2-minute ticket.
+- **API** settings: the same `INFRAHUB_PROXY_KEY` (every non-WebSocket
+  request without it is refused, except health checks) and `FRONTEND_ORIGIN`
+  listing each console origin, comma-separated. Set `APP_BASE_URL` and
+  `OAUTH_REDIRECT_BASE_URL` to the console's address.
+- **Gateway**: pass the same `INFRAHUB_PROXY_KEY` so a local console behind
+  it keeps working.

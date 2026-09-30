@@ -10,7 +10,8 @@ FROM nginx:1.27-alpine-slim
 # deploy/docker/docker-compose.yml and deploy/kubernetes/.
 ENV INFRAHUB_API_UPSTREAM=infrahub-api:8080 \
     INFRAHUB_UI_UPSTREAM=infrahub-ui:3000 \
-    INFRAHUB_MAX_BODY_SIZE=50m
+    INFRAHUB_MAX_BODY_SIZE=50m \
+    INFRAHUB_PROXY_KEY=
 
 COPY default.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
