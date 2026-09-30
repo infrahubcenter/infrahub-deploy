@@ -83,10 +83,31 @@ Nomad, Swarm, plain Docker):
 
 | Container | Image | Port | Required settings |
 |---|---|---|---|
-| infrahub-api | `docker.io/infrahubcenter/infrahub-api:1.0.0` | 8080 | `DATABASE_URL`, `JWT_SECRET`, `SSH_CREDENTIAL_ENCRYPTION_KEY`, `PUBLIC_URL`, `INFRAHUB_CONFIG_DIR=/etc/infrahub` (env-only config) |
-| infrahub-ui | `docker.io/infrahubcenter/infrahub-ui:1.0.0` | 3000 | optional `INFRAHUB_PLAN`, `INFRAHUB_MARKETING_URL` |
+| infrahub-api | `docker.io/infrahubcenter/infrahub-api:1.0.0` | 8080 | `DATABASE_URL`, `JWT_SECRET`, `SSH_CREDENTIAL_ENCRYPTION_KEY`, `PUBLIC_URL`, `INFRAHUB_CONFIG_DIR=/etc/infrahub` (env-only config); optional `INFRAHUB_LICENSE_KEY` |
+| infrahub-ui | `docker.io/infrahubcenter/infrahub-ui:1.0.0` | 3000 | optional `INFRAHUB_MARKETING_URL` |
 | infrahub-gateway | `docker.io/infrahubcenter/infrahub-gateway:1.0.0` | 80 | optional `INFRAHUB_API_UPSTREAM` (default `infrahub-api:8080`), `INFRAHUB_UI_UPSTREAM` (default `infrahub-ui:3000`) |
 | postgres (optional) | `postgres:16-alpine` | 5432 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` |
+
+## Plans and license keys
+
+Every installation runs the free **Community** plan unless the API is given a license key:
+
+| Plan | Users | VMs | Databases | S3 buckets | Docker hosts | K8s clusters | Metrics / logs kept |
+|---|---|---|---|---|---|---|---|
+| Community (free) | 1 | 2 | 1 | 1 | 1 | 1 | 3 days / 3 days |
+| Team (₹3,999/mo) | 15 | 25 | 10 | 5 | 10 | 3 | 30 / 14 days |
+| Business (₹15,999/mo) | Unlimited | 100 | 50 | 25 | 50 | 15 | 90 / 30 days |
+| Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited | Custom |
+
+The API enforces these limits itself. Adding one more VM, database, bucket, Docker host,
+cluster or user past the limit is refused with a clear message, and metrics and logs are
+kept no longer than the plan allows. Existing resources keep working if you go over.
+
+To unlock a paid plan, set `INFRAHUB_LICENSE_KEY` on the API (in `.env` for Docker Compose,
+or as the `license-key` value of the `infrahub-secrets` Secret on Kubernetes) and restart
+it. Keys are signed by Infra Hub Center, so they can't be edited. An expired or altered key
+falls back to Community. **Plans & Billing** in the console shows the active plan, who it
+is licensed to, and usage. For a key, write to infrahubcenter@gmail.com.
 
 Only the gateway needs a published port. Full `docker run` examples are on
 the site's installation page (Method 3).

@@ -112,6 +112,15 @@ spec:
                 secretKeyRef:
                   name: infrahub-secrets
                   key: bootstrap-admin-password
+            # Optional: a paid plan's license key (without it, the free
+            # Community plan). Add --from-literal=license-key=IHC1... to the
+            # secret above.
+            - name: INFRAHUB_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: infrahub-secrets
+                  key: license-key
+                  optional: true
           ports:
             - containerPort: 8080
           readinessProbe:

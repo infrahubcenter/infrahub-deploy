@@ -4,6 +4,7 @@
 /infrahub-api/
 /infrahub-ui/
 /infrahub-site/
+/infrahub-demo/
 /infrahub-agents/
 
 # Local start/stop helper scripts are not part of the repository.
