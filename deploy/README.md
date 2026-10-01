@@ -17,6 +17,19 @@ plus `latest`.
 | `infrahubcenter/infrahub-site` | Public marketing site |
 | `postgres:16-alpine` (optional) | Built-in database -- or use a managed PostgreSQL via `DATABASE_URL` |
 
+## Quick install (one command)
+
+On any 64-bit Linux server with 4 GB RAM:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/infrahubcenter/infrahub-deploy/main/deploy/install.sh | sudo bash
+```
+
+[install.sh](install.sh) installs Docker if it's missing and sets up the Docker Compose stack
+below in `/opt/infrahub`. It generates every secret, asks only for the address and the first
+admin, starts everything and prints where to sign in. Run it again to upgrade; settings and data
+are kept. `--help` lists the unattended options (`--yes --url ... --admin-email ...`).
+
 ## Docker Compose
 
 ```bash
